@@ -13,7 +13,7 @@ test.describe('Garage', () => {
         );
 
         await expect(
-            userGaragePage.getCar(`${brand} ${model}`)
+            userGaragePage.getCar(`${brand} ${model}`).first()
         ).toBeVisible();
     });
 });
