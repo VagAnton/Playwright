@@ -1,27 +1,58 @@
-name: Playwright Tests
+name: Playwright Tests in Docker
+
 on:
   push:
-    branches: [ main, master ]
+    branches: [Docker]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+  workflow_dispatch:
+
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
+    env:
+      BASE_URL: https://qauto.forstudy.space/
+      QAUTO_USERNAME: ${{ secrets.QAUTO_USERNAME }}
+      QAUTO_PASSWORD: ${{ secrets.QAUTO_PASSWORD }}
+      TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
-    - name: Install dependencies
-      run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t playwright-tests .
+
+      - name: Run Playwright tests in Docker
+        run: |
+          mkdir -p playwright-report test-results
+          docker run --rm --init --ipc=host \
+            -e BASE_URL="$BASE_URL" \
+            -e QAUTO_USERNAME="$QAUTO_USERNAME" \
+            -e QAUTO_PASSWORD="$QAUTO_PASSWORD" \
+            -e TEST_EMAIL="$TEST_EMAIL" \
+            -e TEST_PASSWORD="$TEST_PASSWORD" \
+            -v "$GITHUB_WORKSPACE/playwright-report:/app/playwright-report" \
+            -v "$GITHUB_WORKSPACE/test-results:/app/test-results" \
+            playwright-tests
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 30
